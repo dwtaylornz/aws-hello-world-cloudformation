@@ -1,0 +1,640 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  Image:
+    Type: String
+    Default: nginx
+  ServiceName:
+    Type: String
+    Default: hello-world
+  ServiceNameDev:
+    Type: String
+    Default: hello-world-dev
+  ContainerPort:
+    Type: Number
+    Default: 80
+  LoadBalancerPort:
+    Type: Number
+    Default: 80
+Resources:
+  Cluster:
+    Type: 'AWS::ECS::Cluster'
+    Properties: {}
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: c0cdbbfd-c62a-4cf1-90a6-b2a0fe850b33
+  TaskDefinition:
+    Type: 'AWS::ECS::TaskDefinition'
+    Properties:
+      Family: !Join 
+        - ''
+        - - !Ref ServiceName
+          - TaskDefinition
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: 256
+      Memory: 0.5GB
+      ExecutionRoleArn: !Ref ExecutionRole
+      TaskRoleArn: !Ref TaskRole
+      ContainerDefinitions:
+        - Name: !Ref ServiceName
+          Image: !Ref Image
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: c1bcb0ed-2f73-4bff-af7f-4362d37104da
+  ExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 3176fd71-5665-4c2e-ab51-89e9ae59464c
+  TaskRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 6111cad8-b70a-44d7-ab7a-e736e62f2fbc
+  ContainerSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: !Join 
+        - ''
+        - - !Ref ServiceName
+          - ContainerSecurityGroup
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ContainerPort
+          ToPort: !Ref ContainerPort
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 65cf7b42-9a72-4753-a6ff-63fd2af34e0f
+  LoadBalancerSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: !Join 
+        - ''
+        - - !Ref ServiceName
+          - LoadBalancerSecurityGroup
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref LoadBalancerPort
+          ToPort: !Ref LoadBalancerPort
+          CidrIp: 0.0.0.0/0
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 3ca6bead-ca86-46ad-8108-9043f7f96ebe
+  TargetGroupProd:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckTimeoutSeconds: 5
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      Port: !Ref ContainerPort
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref VPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 28b5bf32-b8b2-45d9-a068-89686dce3bc0
+  ListenerHTTPProd:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroupProd
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancerProd
+      Port: !Ref LoadBalancerPort
+      Protocol: HTTP
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 45b6d6c5-3990-4158-8018-d86846a24ca0
+  LoadBalancerProd:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Subnets:
+        - !Ref SubnetA
+        - !Ref SubnetB
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 191be320-7270-4b2f-b772-8963cb31fbc4
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: 10.0.0.0/16
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: cbf7270f-1230-49a7-bea7-530f27f6f4a3
+  SubnetA:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: 10.0.1.0/24
+      VpcId: !Ref VPC
+      AvailabilityZone: ap-southeast-2a
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 8730ef8b-b0d0-4838-bbcb-603edb433ac8
+  SubnetB:
+    Type: 'AWS::EC2::Subnet'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 8f2b0a86-217a-4e96-a053-af1c3a37e7b8
+    Properties:
+      CidrBlock: 10.0.2.0/24
+      VpcId: !Ref VPC
+      AvailabilityZone: ap-southeast-2b
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties: {}
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 10c2b83c-ae9d-4f9a-b9cd-67f55702a2a2
+  EC2VPCG3LAHH:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 56720164-799e-485d-86ef-f63c9d867008
+  RouteViaIgw:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+  PublicRouteViaIgw:
+    Type: 'AWS::EC2::Route'
+    DependsOn: InternetGateway
+    Properties:
+      RouteTableId: !Ref RouteViaIgw
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: a58e0204-ea15-43fc-84c6-0e44a7d59e49
+  PubSubnet1RouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref SubnetA
+      RouteTableId: !Ref RouteViaIgw
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 7b4bc5d2-d5d6-40ff-ba96-78441526789e
+  PubSubnet2RouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref SubnetB
+      RouteTableId: !Ref RouteViaIgw
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: c1e114bb-8ebe-4a80-833f-cbe1c703e7c9
+  ServiceProd:
+    Type: 'AWS::ECS::Service'
+    DependsOn:
+      - ListenerHTTPProd
+    Properties:
+      ServiceName: !Ref ServiceName
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      DesiredCount: 1
+      HealthCheckGracePeriodSeconds: 30
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref SubnetA
+            - !Ref SubnetB
+          SecurityGroups:
+            - !Ref ContainerSecurityGroup
+      LoadBalancers:
+        - ContainerName: !Ref ServiceName
+          ContainerPort: !Ref ContainerPort
+          TargetGroupArn: !Ref TargetGroupProd
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: bf2cef17-191d-44a0-81a5-5763467353b2
+  LoadBalancerDev:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      SubnetMappings:
+        - SubnetId: !Ref SubnetA
+        - SubnetId: !Ref SubnetB
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 4c56a239-688c-433a-a388-d7895448f9d4
+  ListenerHTTPDev:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroupDev
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancerDev
+      Port: !Ref LoadBalancerPort
+      Protocol: HTTP
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 0601d8f8-3c15-481b-aaef-514fbc17043d
+  TargetGroupDev:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckTimeoutSeconds: 5
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      Port: !Ref ContainerPort
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref VPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: ee8c6ea7-b778-4f7d-9b95-e279ce301a4d
+  ServiceDev:
+    Type: 'AWS::ECS::Service'
+    Properties:
+      ServiceName: !Ref ServiceNameDev
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      DesiredCount: 1
+      HealthCheckGracePeriodSeconds: 30
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref SubnetA
+            - !Ref SubnetB
+          SecurityGroups:
+            - !Ref ContainerSecurityGroup
+      LoadBalancers:
+        - ContainerName: !Ref ServiceName
+          ContainerPort: !Ref ContainerPort
+          TargetGroupArn: !Ref TargetGroupDev
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 735e5d86-5853-4f39-9c42-943f0056d4b4
+    DependsOn:
+      - ListenerHTTPDev
+Metadata:
+  'AWS::CloudFormation::Designer':
+    28b5bf32-b8b2-45d9-a068-89686dce3bc0:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 520
+        'y': 70
+      z: 1
+      embeds: []
+      iscontainedinside:
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+    3ca6bead-ca86-46ad-8108-9043f7f96ebe:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 250
+        'y': 220
+      z: 1
+      embeds: []
+      iscontainedinside:
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+    191be320-7270-4b2f-b772-8963cb31fbc4:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 150
+        'y': 70
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - 3ca6bead-ca86-46ad-8108-9043f7f96ebe
+      iscontainedinside:
+        - 8730ef8b-b0d0-4838-bbcb-603edb433ac8
+        - 8f2b0a86-217a-4e96-a053-af1c3a37e7b8
+    45b6d6c5-3990-4158-8018-d86846a24ca0:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 300
+        'y': 70
+      z: 1
+      embeds: []
+    65cf7b42-9a72-4753-a6ff-63fd2af34e0f:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 370
+        'y': 220
+      z: 1
+      embeds: []
+      iscontainedinside:
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+    6111cad8-b70a-44d7-ab7a-e736e62f2fbc:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 1070
+        'y': 350
+      z: 1
+      embeds: []
+    3176fd71-5665-4c2e-ab51-89e9ae59464c:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 1040
+        'y': 260
+      z: 1
+      embeds: []
+    c1bcb0ed-2f73-4bff-af7f-4362d37104da:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 920
+        'y': 230
+      z: 1
+      embeds: []
+    c0cdbbfd-c62a-4cf1-90a6-b2a0fe850b33:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 760
+        'y': 250
+      z: 1
+      embeds: []
+    bf2cef17-191d-44a0-81a5-5763467353b2:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 660
+        'y': 100
+      z: 1
+      embeds: []
+      dependson:
+        - 45b6d6c5-3990-4158-8018-d86846a24ca0
+    cbf7270f-1230-49a7-bea7-530f27f6f4a3:
+      size:
+        width: 530
+        height: 490
+      position:
+        x: -460
+        'y': 70
+      z: 1
+      embeds:
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - 8f2b0a86-217a-4e96-a053-af1c3a37e7b8
+        - 8730ef8b-b0d0-4838-bbcb-603edb433ac8
+    8730ef8b-b0d0-4838-bbcb-603edb433ac8:
+      size:
+        width: 150
+        height: 150
+      position:
+        x: -210
+        'y': 320
+      z: 2
+      parent: cbf7270f-1230-49a7-bea7-530f27f6f4a3
+      embeds: []
+      iscontainedinside:
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+    8f2b0a86-217a-4e96-a053-af1c3a37e7b8:
+      size:
+        width: 150
+        height: 150
+      position:
+        x: -210
+        'y': 120
+      z: 2
+      parent: cbf7270f-1230-49a7-bea7-530f27f6f4a3
+      embeds: []
+      iscontainedinside:
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+    10c2b83c-ae9d-4f9a-b9cd-67f55702a2a2:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: -560
+        'y': 180
+      z: 0
+      embeds: []
+    56720164-799e-485d-86ef-f63c9d867008:
+      source:
+        id: cbf7270f-1230-49a7-bea7-530f27f6f4a3
+      target:
+        id: 10c2b83c-ae9d-4f9a-b9cd-67f55702a2a2
+      z: 1
+    d6b0f7d9-43d2-48c3-a96e-770e6a4136a9:
+      size:
+        width: 170
+        height: 170
+      position:
+        x: -420
+        'y': 110
+      z: 2
+      parent: cbf7270f-1230-49a7-bea7-530f27f6f4a3
+      embeds:
+        - a58e0204-ea15-43fc-84c6-0e44a7d59e49
+      iscontainedinside:
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+    a58e0204-ea15-43fc-84c6-0e44a7d59e49:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: -390
+        'y': 170
+      z: 3
+      parent: d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+      embeds: []
+      iscontainedinside:
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+        - d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+      dependson:
+        - 10c2b83c-ae9d-4f9a-b9cd-67f55702a2a2
+    7b4bc5d2-d5d6-40ff-ba96-78441526789e:
+      source:
+        id: d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+      target:
+        id: 8730ef8b-b0d0-4838-bbcb-603edb433ac8
+      z: 2
+    c1e114bb-8ebe-4a80-833f-cbe1c703e7c9:
+      source:
+        id: d6b0f7d9-43d2-48c3-a96e-770e6a4136a9
+      target:
+        id: 8f2b0a86-217a-4e96-a053-af1c3a37e7b8
+      z: 2
+    4c56a239-688c-433a-a388-d7895448f9d4:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 150
+        'y': 360
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - 3ca6bead-ca86-46ad-8108-9043f7f96ebe
+      iscontainedinside:
+        - 8730ef8b-b0d0-4838-bbcb-603edb433ac8
+        - 8f2b0a86-217a-4e96-a053-af1c3a37e7b8
+    0601d8f8-3c15-481b-aaef-514fbc17043d:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 290
+        'y': 360
+      z: 1
+      embeds: []
+    ee8c6ea7-b778-4f7d-9b95-e279ce301a4d:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 490
+        'y': 350
+      z: 1
+      embeds: []
+      iscontainedinside:
+        - cbf7270f-1230-49a7-bea7-530f27f6f4a3
+    735e5d86-5853-4f39-9c42-943f0056d4b4:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 620
+        'y': 350
+      z: 1
+      embeds: []
+      dependson:
+        - 45b6d6c5-3990-4158-8018-d86846a24ca0
+        - 0601d8f8-3c15-481b-aaef-514fbc17043d
